@@ -1,56 +1,52 @@
-from flask import Flask
-from flask_sock import Sock
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
-sock = Sock(app)
 
-clients = set()
+MESSAGES = []
+MAX_MESSAGES = 500
+SECRET = "hotburger123"
 
 
 @app.route("/")
 def home():
-    return "HOTBURGER WebSocket Server Alive"
+    return "HOTBURGER SERVER OK"
 
 
-@sock.route("/ws")
-def websocket(ws):
-    clients.add(ws)
-    print("클라이언트 연결됨:", len(clients))
-
+@app.route("/push", methods=["POST"])
+def push():
     try:
-        while True:
-            data = ws.receive()
+        data = request.get_json(force=True)
+        secret = str(data.get("secret", ""))
+        text = str(data.get("text", "")).strip()
 
-            if data is None:
-                break
-            print("메시지 수신:", str(data)[:50])
+        if secret != SECRET:
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
 
-            # 클라이언트 keepalive 용도
-            if data in ("__hello__", "__ping__"):
-                continue
+        if not text:
+            return jsonify({"ok": False, "error": "empty text"}), 400
 
-            dead = []
-            for c in list(clients):
-                if c is ws:
-                    continue
-                try:
-                    c.send(data)
-                except:
-                    dead.append(c)
+        MESSAGES.append(text)
 
-            for d in dead:
-                try:
-                    clients.remove(d)
-                except:
-                    pass
+        if len(MESSAGES) > MAX_MESSAGES:
+            del MESSAGES[:-MAX_MESSAGES]
+
+        return jsonify({"ok": True, "count": len(MESSAGES)})
 
     except Exception as e:
-        print("에러:", e)
+        return jsonify({"ok": False, "error": str(e)}), 500
 
-    finally:
-        try:
-            clients.remove(ws)
-        except:
-            pass
 
-        print("연결 종료:", len(clients))
+@app.route("/pull", methods=["GET"])
+def pull():
+    try:
+        after = int(request.args.get("after", "-1"))
+        items = []
+
+        for idx, text in enumerate(MESSAGES):
+            if idx > after:
+                items.append({"id": idx, "text": text})
+
+        return jsonify({"ok": True, "items": items})
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
