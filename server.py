@@ -23,8 +23,11 @@ def websocket(ws):
 
             if data is None:
                 break
-
             print("메시지 수신:", str(data)[:50])
+
+            # 클라이언트 keepalive 용도
+            if data in ("__hello__", "__ping__"):
+                continue
 
             dead = []
             for c in list(clients):
