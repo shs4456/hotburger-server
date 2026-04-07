@@ -1,50 +1,47 @@
-import socket
-import threading
-import json
+from flask import Flask, request, jsonify
+import time
 import os
 
-HOST = "0.0.0.0"
-PORT = int(os.environ.get("PORT", 10000))
+app = Flask(__name__)
 
-clients = []
+messages = []
+next_id = 1
 
-def handle_client(conn, addr):
-    print(f"🔥 연결됨: {addr}")
-    clients.append(conn)
+@app.get("/")
+def home():
+    return "hotburger server alive", 200
 
-    try:
-        while True:
-            data = conn.recv(4096)
-            if not data:
-                break
+@app.post("/push")
+def push():
+    global next_id
 
-            print("📨 메시지 수신")
+    data = request.get_json(silent=True) or {}
+    text = data.get("text", "")
+    stock = data.get("stock", "")
+    sender = data.get("sender", "main")
 
-            for c in clients:
-                try:
-                    c.send(data)
-                except:
-                    pass
+    item = {
+        "id": next_id,
+        "ts": time.time(),
+        "text": text,
+        "stock": stock,
+        "sender": sender,
+    }
+    next_id += 1
+    messages.append(item)
 
-    except:
-        pass
+    # 최근 200개만 유지
+    if len(messages) > 200:
+        del messages[:-200]
 
-    finally:
-        print(f"❌ 연결 종료: {addr}")
-        clients.remove(conn)
-        conn.close()
+    return jsonify({"ok": True, "id": item["id"]})
 
-def start_server():
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((HOST, PORT))
-    server.listen()
-
-    print(f"🚀 서버 실행됨 {HOST}:{PORT}")
-
-    while True:
-        conn, addr = server.accept()
-        thread = threading.Thread(target=handle_client, args=(conn, addr))
-        thread.start()
+@app.get("/poll")
+def poll():
+    after = request.args.get("after", default=0, type=int)
+    items = [m for m in messages if m["id"] > after]
+    return jsonify({"ok": True, "messages": items})
 
 if __name__ == "__main__":
-    start_server()
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
