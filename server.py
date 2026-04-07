@@ -1,47 +1,40 @@
-from flask import Flask, request, jsonify
-import time
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import json
 import os
 
-app = Flask(__name__)
+app = FastAPI()
 
-messages = []
-next_id = 1
+clients: list[WebSocket] = []
+
 
 @app.get("/")
-def home():
-    return "hotburger server alive", 200
+async def home():
+    return {"status": "ok", "message": "HOTBURGER WEBSOCKET SERVER LIVE"}
 
-@app.post("/push")
-def push():
-    global next_id
 
-    data = request.get_json(silent=True) or {}
-    text = data.get("text", "")
-    stock = data.get("stock", "")
-    sender = data.get("sender", "main")
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    await ws.accept()
+    clients.append(ws)
+    print("🔥 웹소켓 연결됨")
 
-    item = {
-        "id": next_id,
-        "ts": time.time(),
-        "text": text,
-        "stock": stock,
-        "sender": sender,
-    }
-    next_id += 1
-    messages.append(item)
+    try:
+        while True:
+            data = await ws.receive_text()
+            print("📨 메시지 수신:", data)
 
-    # 최근 200개만 유지
-    if len(messages) > 200:
-        del messages[:-200]
+            dead = []
+            for client in clients:
+                try:
+                    await client.send_text(data)
+                except Exception:
+                    dead.append(client)
 
-    return jsonify({"ok": True, "id": item["id"]})
+            for d in dead:
+                if d in clients:
+                    clients.remove(d)
 
-@app.get("/poll")
-def poll():
-    after = request.args.get("after", default=0, type=int)
-    items = [m for m in messages if m["id"] > after]
-    return jsonify({"ok": True, "messages": items})
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    except WebSocketDisconnect:
+        print("❌ 웹소켓 연결 종료")
+        if ws in clients:
+            clients.remove(ws)
