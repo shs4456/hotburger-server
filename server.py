@@ -50,3 +50,40 @@ def pull():
 
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+# =========================
+# 시장 데이터 저장
+# =========================
+MARKET_DATA = {}
+
+@app.route("/market_push", methods=["POST"])
+def market_push():
+    try:
+        data = request.get_json(force=True)
+        secret = data.get("secret", "")
+
+        if secret != SECRET:
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
+
+        global MARKET_DATA
+        MARKET_DATA = data.get("market", {})
+
+        return jsonify({"ok": True})
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# =========================
+# 시장 데이터 조회
+# =========================
+@app.route("/market", methods=["GET"])
+def market():
+    try:
+        return jsonify({
+            "ok": True,
+            "market": MARKET_DATA
+        })
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
