@@ -18,6 +18,7 @@ def push():
         data = request.get_json(force=True)
         secret = str(data.get("secret", ""))
         text = str(data.get("text", "")).strip()
+        stock_name = str(data.get("stock_name", "")).strip()
 
         if secret != SECRET:
             return jsonify({"ok": False, "error": "unauthorized"}), 401
@@ -25,7 +26,10 @@ def push():
         if not text:
             return jsonify({"ok": False, "error": "empty text"}), 400
 
-        MESSAGES.append(text)
+        MESSAGES.append({
+            "text": text,
+            "stock_name": stock_name,
+        })
 
         if len(MESSAGES) > MAX_MESSAGES:
             del MESSAGES[:-MAX_MESSAGES]
@@ -42,9 +46,13 @@ def pull():
         after = int(request.args.get("after", "-1"))
         items = []
 
-        for idx, text in enumerate(MESSAGES):
+        for idx, item in enumerate(MESSAGES):
             if idx > after:
-                items.append({"id": idx, "text": text})
+                items.append({
+                    "id": idx,
+                    "text": item.get("text", ""),
+                    "stock_name": item.get("stock_name", ""),
+                })
 
         return jsonify({"ok": True, "items": items})
 
