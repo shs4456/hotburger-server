@@ -6,6 +6,11 @@ MESSAGES = []
 MAX_MESSAGES = 500
 SECRET = "hotburger123"
 
+LATEST_BOARD_FEED = {
+    "updated_at": "",
+    "events": []
+}
+
 
 @app.route("/")
 def home():
@@ -56,6 +61,41 @@ def pull():
 
         return jsonify({"ok": True, "items": items})
 
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+# =========================
+# 보드 feed 저장
+# =========================
+@app.route("/board_feed_push", methods=["POST"])
+def board_feed_push():
+    try:
+        data = request.get_json(force=True)
+        secret = str(data.get("secret", ""))
+
+        if secret != SECRET:
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
+
+        feed = data.get("feed", {})
+        if not isinstance(feed, dict):
+            return jsonify({"ok": False, "error": "invalid feed"}), 400
+
+        global LATEST_BOARD_FEED
+        LATEST_BOARD_FEED = feed
+
+        return jsonify({"ok": True})
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# =========================
+# 보드 feed 조회
+# =========================
+@app.route("/board-feed", methods=["GET"])
+def board_feed():
+    try:
+        return jsonify(LATEST_BOARD_FEED)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
