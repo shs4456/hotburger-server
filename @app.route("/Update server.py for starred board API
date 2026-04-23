@@ -10,6 +10,10 @@ LATEST_BOARD_FEED = {
     "updated_at": "",
     "events": []
 }
+LATEST_BOARD_STARRED = {
+    "updated_at": "",
+    "items": []
+}
 
 
 @app.route("/")
@@ -98,6 +102,42 @@ def board_feed():
         return jsonify(LATEST_BOARD_FEED)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+# =========================
+# 보드 starred 저장
+# =========================
+@app.route("/board_starred_push", methods=["POST"])
+def board_starred_push():
+    try:
+        data = request.get_json(force=True)
+        secret = str(data.get("secret", ""))
+
+        if secret != SECRET:
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
+
+        starred = data.get("starred", {})
+        if not isinstance(starred, dict):
+            return jsonify({"ok": False, "error": "invalid starred"}), 400
+
+        global LATEST_BOARD_STARRED
+        LATEST_BOARD_STARRED = starred
+
+        return jsonify({"ok": True})
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    
+
+# =========================
+# 보드 starred 조회
+# =========================
+@app.route("/board-starred", methods=["GET"])
+def board_starred():
+    try:
+        return jsonify(LATEST_BOARD_STARRED)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 
 # =========================
 # 시장 데이터 저장
